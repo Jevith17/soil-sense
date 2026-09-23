@@ -1,0 +1,91 @@
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+        soil: {
+          50: "#faf8f5",
+          100: "#f3efe8",
+          200: "#e6decb",
+          300: "#d4c5a9",
+          400: "#b59e79",
+          500: "#8c734b",
+          600: "#6e5737",
+          700: "#524028",
+          800: "#3b2e1e",
+          900: "#261e14",
+        },
+        forest: {
+          50: "#f3f7f4",
+          100: "#e3eee5",
+          200: "#c7ddcb",
+          300: "#9ec4a6",
+          400: "#6ea57a",
+          500: "#498858",
+          600: "#336d40",
+          700: "#275533",
+          800: "#1e3f28",
+          900: "#173020",
+          950: "#0d1b12",
+        },
+        charcoal: {
+          50: "#f7f8f8",
+          100: "#e6e8ea",
+          200: "#cccfd3",
+          300: "#a6acb2",
+          400: "#7c848c",
+          500: "#5c646c",
+          600: "#444a50",
+          700: "#31363b",
+          800: "#212428",
+          900: "#15171a",
+          950: "#0c0d0f",
+        },
+        olive: {
+          50: "#f6f7f3",
+          100: "#ebede4",
+          200: "#d8dccb",
+          300: "#bcc3a8",
+          400: "#9ea783",
+          500: "#818c64",
+          600: "#646e4b",
+          700: "#4d553a",
+          800: "#3d432f",
+          900: "#323727",
+        }
+      },
+      fontFamily: {
+        sans: [
+          "Inter",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"Segoe UI"',
+          "Roboto",
+          '"Helvetica Neue"',
+          "Arial",
+          "sans-serif",
+        ],
+        mono: [
+          '"JetBrains Mono"',
+          '"SFMono-Regular"',
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          '"Liberation Mono"',
+          '"Courier New"',
+          "monospace",
+        ],
+      },
+    },
+  },
+  plugins: [],
+};
+export default config;
