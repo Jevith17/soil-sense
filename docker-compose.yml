@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: agrichem-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - PUMP_HARDWARE_ENABLED=false
+      - DATABASE_URL=sqlite:///./agrichem.db
+      - SECRET_KEY=agrichem-ai-super-secret-key-change-in-production-2026
+    volumes:
+      - ./data:/app/data
+      - ./agrichem.db:/app/agrichem.db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: agrichem-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+    restart: unless-stopped
