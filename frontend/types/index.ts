@@ -113,6 +113,14 @@ export interface Action {
   execution_status: string;
   is_hardware_dispatched: boolean;
   executed_at?: string;
+  approval_id?: string;
+  channel?: number;
+  duration_s?: number;
+  events?: number;
+  interval_s?: number;
+  actual_on_ms?: number;
+  event_no?: number;
+  ack_status?: string;
 }
 
 export interface Experiment {

@@ -15,7 +15,7 @@ class SensorHealthEngine:
       6. Cross-sensor disagreement (analog vs digital moisture)
     """
 
-    KEY_SENSORS = ["moisture", "soil_temp", "ph"]
+    KEY_SENSORS = ["moisture", "soil_temp", "air_temp", "humidity", "ph"]
 
     # Physical valid operational ranges
     RANGES = {
@@ -43,7 +43,13 @@ class SensorHealthEngine:
     }
 
     @classmethod
-    def evaluate(cls, current: Reading, recent_history: Optional[List[Reading]] = None) -> SensorHealthSummary:
+    def evaluate(
+        cls, 
+        current: Reading, 
+        recent_history: Optional[List[Reading]] = None,
+        esp_health: Optional[Dict[str, str]] = None,
+        esp_overall: Optional[str] = None
+    ) -> SensorHealthSummary:
         sensor_details: Dict[str, SensorCheckDetail] = {}
         history = recent_history or []
         requires_verify = False
@@ -106,6 +112,21 @@ class SensorHealthEngine:
                         status = "FAULT"
                         msg = f"Sensor conflict: analog reads {val}% but digital pin indicates {'wet' if digital_raw == 0 else 'dry'}."
 
+            # First-line checks forwarded directly from ESP32 edge node
+            if esp_health:
+                if sensor_name == "moisture" and esp_health.get("moisture") == "FAULT":
+                    status = "FAULT"
+                    checks["range"] = False
+                    msg = "ESP32 reported ADC out of valid window (shorted or disconnected probe)."
+                elif sensor_name == "soil_temp" and esp_health.get("soil_temp") == "FAULT":
+                    status = "FAULT"
+                    checks["range"] = False
+                    msg = "ESP32 reported DS18B20 fault (-127°C disconnected or 85°C boot default)."
+                elif sensor_name in ["air_temp", "humidity"] and esp_health.get("dht22") == "FAULT":
+                    status = "FAULT"
+                    checks["range"] = False
+                    msg = "ESP32 reported DHT22 communication failure or NaN readout."
+
             if status == "FAULT":
                 has_fault = True
                 if sensor_name in cls.KEY_SENSORS:
@@ -122,13 +143,45 @@ class SensorHealthEngine:
                 message=msg
             )
 
+        # 2. Add telemetry link status
+        link_status = "NORMAL"
+        link_msg = "ESP32 telemetry link active."
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        cur_ts = current.timestamp or now
+        if cur_ts.tzinfo is None:
+            cur_ts = cur_ts.replace(tzinfo=timezone.utc)
+        age_seconds = (now - cur_ts).total_seconds()
+
+        if age_seconds > 30.0 and current.data_source in ["REAL", "Measured"]:
+            link_status = "FAULT"
+            link_msg = f"Communication lost: No telemetry packet received for {int(age_seconds)}s."
+            has_fault = True
+            requires_verify = True
+        elif age_seconds > 15.0 and current.data_source in ["REAL", "Measured"]:
+            link_status = "CHECK"
+            link_msg = f"Telemetry packet latency elevated ({int(age_seconds)}s)."
+            has_check = True
+
+        sensor_details["link"] = SensorCheckDetail(
+            name="link",
+            value=link_status,
+            unit="",
+            status=link_status,
+            checks={"connected": link_status != "FAULT"},
+            message=link_msg
+        )
+
+        if esp_overall == "FAULT":
+            has_fault = True
+            requires_verify = True
+
         overall = "FAULT" if has_fault else ("CHECK" if has_check else "NORMAL")
 
-        from datetime import timezone
         return SensorHealthSummary(
             overall_status=overall,
             requires_verify=requires_verify,
-            timestamp=current.timestamp or datetime.now(timezone.utc),
+            timestamp=cur_ts,
             sensors=sensor_details
         )
 

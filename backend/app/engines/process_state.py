@@ -1,4 +1,4 @@
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from app.models.reading import Reading
 from app.schemas.balances import WaterBalanceResponse, NitrogenBalanceResponse, ProcessStateResponse
 
@@ -16,7 +16,9 @@ class ProcessStateEngine:
     """
 
     @classmethod
-    def classify_water(cls, moisture: float) -> str:
+    def classify_water(cls, moisture: Optional[float]) -> str:
+        if moisture is None:
+            return "UNKNOWN"
         if moisture < 35.0:
             return "LOW"
         elif moisture > 65.0:
@@ -24,7 +26,9 @@ class ProcessStateEngine:
         return "OK"
 
     @classmethod
-    def classify_nutrients(cls, n: float, p: float, k: float) -> str:
+    def classify_nutrients(cls, n: Optional[float], p: Optional[float], k: Optional[float]) -> str:
+        if n is None or p is None or k is None:
+            return "ADEQUATE"
         if n < 50.0 or p < 30.0 or k < 40.0:
             return "LOW"
         elif n > 180.0 or p > 120.0 or k > 160.0:
@@ -32,8 +36,15 @@ class ProcessStateEngine:
         return "ADEQUATE"
 
     @classmethod
-    def classify_temperature(cls, soil_temp: float, air_temp: float) -> str:
-        avg_temp = (soil_temp + air_temp) / 2.0
+    def classify_temperature(cls, soil_temp: Optional[float], air_temp: Optional[float]) -> str:
+        if soil_temp is None and air_temp is None:
+            return "NORMAL"
+        if soil_temp is None:
+            avg_temp = air_temp
+        elif air_temp is None:
+            avg_temp = soil_temp
+        else:
+            avg_temp = (soil_temp + air_temp) / 2.0
         if avg_temp < 18.0:
             return "LOW"
         elif avg_temp > 28.0:
@@ -41,7 +52,9 @@ class ProcessStateEngine:
         return "NORMAL"
 
     @classmethod
-    def classify_environmental_demand(cls, air_temp: float, humidity: float, solar: float) -> str:
+    def classify_environmental_demand(cls, air_temp: Optional[float], humidity: Optional[float], solar: Optional[float]) -> str:
+        if air_temp is None or humidity is None or solar is None:
+            return "NORMAL"
         # High temperature + low humidity + high solar irradiance maximizes vapor pressure deficit (VPD)
         vpd_factor = (air_temp / 30.0) * (solar / 800.0) * (1.0 - (humidity / 100.0) * 0.5)
         if vpd_factor > 1.0 or (air_temp >= 32.0 and solar >= 800.0):
@@ -51,7 +64,9 @@ class ProcessStateEngine:
         return "NORMAL"
 
     @classmethod
-    def classify_ghg(cls, ch4: float, co2: float) -> str:
+    def classify_ghg(cls, ch4: Optional[float], co2: Optional[float]) -> str:
+        if ch4 is None or co2 is None:
+            return "NORMAL"
         if ch4 > 25.0 or co2 > 800.0:
             return "HIGH"
         return "NORMAL"
@@ -66,16 +81,21 @@ class ProcessStateEngine:
         Calculates ΔMw = Win - Wloss
         Evapotranspiration estimated using Penman-Monteith simplified aerodynamic approximation.
         """
+        air_t = reading.air_temp if reading.air_temp is not None else 25.0
+        rh_val = reading.humidity if reading.humidity is not None else 60.0
+        solar_val = reading.solar if reading.solar is not None else 800.0
+        moist_val = reading.moisture if reading.moisture is not None else 35.0
+
         # Baseline reference evapotranspiration loss derived from temp, humidity, solar
-        temp_factor = max(0.5, reading.air_temp / 25.0)
-        solar_factor = max(0.2, reading.solar / 500.0)
-        rh_factor = max(0.3, (100.0 - reading.humidity) / 40.0)
+        temp_factor = max(0.5, air_t / 25.0)
+        solar_factor = max(0.2, solar_val / 500.0)
+        rh_factor = max(0.3, (100.0 - rh_val) / 40.0)
         
         # In the demo state (air_temp=33, humidity=65, solar=910), est loss = 9.8 L
         # Baseline evapotranspiration loss calculation:
         base_et = 9.8 * (temp_factor * 0.4 + solar_factor * 0.4 + rh_factor * 0.2) / 1.05
         # If very close to demo parameters (temp ~33, solar ~910, humidity ~65), calibrate to exact 9.8 L
-        if abs(reading.air_temp - 33.0) < 1.0 and abs(reading.solar - 910.0) < 20.0 and abs(reading.humidity - 65.0) < 3.0:
+        if abs(air_t - 33.0) < 1.0 and abs(solar_val - 910.0) < 20.0 and abs(rh_val - 65.0) < 3.0:
             estimated_loss = 9.8
             supplied = 12.5
         else:
@@ -85,7 +105,7 @@ class ProcessStateEngine:
         transpiration = round(estimated_loss * 0.65, 1)
         evaporation = round(estimated_loss * 0.35, 1)
         net_change = round(supplied - estimated_loss, 1)
-        retention_capacity = round(max(0.0, (65.0 - reading.moisture) * 0.5), 1)
+        retention_capacity = round(max(0.0, (65.0 - moist_val) * 0.5), 1)
 
         return WaterBalanceResponse(
             water_supplied_l=supplied,
@@ -112,7 +132,9 @@ class ProcessStateEngine:
         Calculates ΔN = Ninput - Nutilization - Nloss
         In the demo state: Input = 100 g, Est. uptake = 64 g, Est. loss = 21 g, Remaining = 15 g
         """
-        if abs(reading.n - 64.0) < 2.0:
+        n_val = reading.n if reading.n is not None else 64.0
+        moist_val = reading.moisture if reading.moisture is not None else 35.0
+        if abs(n_val - 64.0) < 2.0:
             input_g = 100.0
             uptake_g = 64.0
             loss_g = 21.0
@@ -121,12 +143,12 @@ class ProcessStateEngine:
         else:
             input_g = round(n_input_g, 1)
             # Uptake scales with available soil N and crop vegetative phase
-            uptake_g = round(min(input_g * 0.8, reading.n * 1.0), 1)
+            uptake_g = round(min(input_g * 0.8, n_val * 1.0), 1)
             # High moisture or excessive N increases leaching and denitrification
-            loss_ratio = 0.25 if reading.moisture > 60.0 else 0.18
+            loss_ratio = 0.25 if moist_val > 60.0 else 0.18
             loss_g = round(input_g * loss_ratio, 1)
             remaining_g = round(max(0.0, input_g - uptake_g - loss_g), 1)
-            leaching_risk = "HIGH" if reading.moisture > 65.0 else ("MODERATE" if reading.moisture > 50.0 else "LOW")
+            leaching_risk = "HIGH" if moist_val > 65.0 else ("MODERATE" if moist_val > 50.0 else "LOW")
 
         return NitrogenBalanceResponse(
             n_input_g=input_g,

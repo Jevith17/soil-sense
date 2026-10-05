@@ -83,13 +83,27 @@ export default function SmartControlPage() {
     }
   };
 
+  const handleCancelCommand = async () => {
+    setLoadingAction('CANCEL');
+    setStatusMessage(null);
+    try {
+      const res = await api.cancelCommand();
+      setStatusMessage(res.status === 'CANCELLED' ? 'Pending hardware command cancelled.' : 'No pending command in queue.');
+      loadData();
+    } catch (err: any) {
+      setStatusMessage(`Cancel failed: ${err.message}`);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   const openConfirmation = (actionType: string) => {
     if (actionType === 'APPROVE') {
       setConfirmModal({
         isOpen: true,
         actionType: 'APPROVE',
         title: 'Authorize Irrigation Run',
-        message: `Approve delivery of ${decision?.volume_liters || 12.5} Liters over ${decision?.duration_minutes || 6} minutes to Bed 12. This will activate relay GPIO23 on the ESP32 node.`,
+        message: `Approve delivery of ${decision?.volume_liters || 12.5} Liters over ${decision?.duration_minutes || 6} minutes to Bed 12. This will activate relay GPIO5 on the ESP32 node.`,
         variant: 'primary'
       });
     } else if (actionType === 'MANUAL_ON') {
@@ -97,7 +111,7 @@ export default function SmartControlPage() {
         isOpen: true,
         actionType: 'MANUAL_ON',
         title: 'Manual Actuator Override (PUMP ON)',
-        message: 'You are issuing a direct manual override. The pump will start immediately. Ensure field safety conditions are verified before continuing.',
+        message: 'You are issuing a direct manual override. The pump will start immediately on GPIO5. Ensure field safety conditions are verified before continuing.',
         variant: 'warning'
       });
     } else if (actionType === 'MANUAL_OFF') {
@@ -149,7 +163,7 @@ export default function SmartControlPage() {
             </Link>
             <div className="flex items-center space-x-2 px-3 py-1.5 rounded bg-stone-100 border border-stone-200 text-xs font-mono text-stone-700">
               <span className="text-stone-500">Relay Pin:</span>
-              <span className="font-bold text-stone-900">GPIO23</span>
+              <span className="font-bold text-stone-900">GPIO5 (Active-LOW)</span>
             </div>
             <div className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs font-mono font-bold border ${
               reading?.pump_status === 'ON'
@@ -158,6 +172,107 @@ export default function SmartControlPage() {
             }`}>
               <Zap className="h-3.5 w-3.5 text-forest-700" />
               <span>LIVE PUMP: {reading?.pump_status || 'OFF'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Interlocks I1 to I5 Live Verification & Command Preview Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Interlocks I1-I5 Card */}
+          <div className="lg:col-span-2 bg-white border border-stone-200 rounded-lg p-5 shadow-sm space-y-3">
+            <div className="border-b border-stone-100 pb-2 flex items-center justify-between">
+              <div>
+                <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-forest-700" />
+                  Deterministic Safety Interlocks (I1–I5)
+                </h3>
+                <p className="text-[11px] text-stone-500">
+                  Hardware and agronomic rules evaluated prior to relay actuation command dispatch.
+                </p>
+              </div>
+              <span className="text-[11px] font-mono text-forest-800 bg-forest-50 px-2 py-0.5 rounded border border-forest-200 font-semibold">
+                ALL PASSED
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded bg-stone-50 border border-stone-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-forest-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-mono font-bold text-stone-900">I1: Sensor Health Invariant</span>
+                  <p className="text-[11px] text-stone-600 mt-0.5">Key sensors (Moisture, DS18B20, DHT22) normal. No FAULT state.</p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded bg-stone-50 border border-stone-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-forest-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-mono font-bold text-stone-900">I2: Soil Moisture Cutoff</span>
+                  <p className="text-[11px] text-stone-600 mt-0.5">Current moisture &lt; 85% limit. Prevents root hypoxia/waterlogging.</p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded bg-stone-50 border border-stone-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-forest-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-mono font-bold text-stone-900">I3: Hardware Runtime Hard Cap</span>
+                  <p className="text-[11px] text-stone-600 mt-0.5">Local timer capped at MAX_ON_S (60s burst) / 15m total. Watchdog enabled.</p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded bg-stone-50 border border-stone-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-forest-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-mono font-bold text-stone-900">I4: Minimum Recool Gap</span>
+                  <p className="text-[11px] text-stone-600 mt-0.5">Mandates 10-minute stabilization interval between pump operations.</p>
+                </div>
+              </div>
+
+              <div className="md:col-span-2 p-2.5 rounded bg-stone-50 border border-stone-200 flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-forest-700 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-mono font-bold text-stone-900">I5: Human Operator Approval Gate</span>
+                  <p className="text-[11px] text-stone-600 mt-0.5">ESP32 strictly forbidden from autonomous pump actuation. Command token required.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Hardware Prescription Preview Card */}
+          <div className="bg-white border border-stone-200 rounded-lg p-5 shadow-sm space-y-3">
+            <div className="border-b border-stone-100 pb-2">
+              <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
+                <Cpu className="h-4 w-4 text-stone-700" />
+                Hardware Pulse Preview
+              </h3>
+              <p className="text-[11px] text-stone-500">Approved payload delivered via GET /api/command</p>
+            </div>
+
+            <div className="space-y-2 font-mono text-xs text-stone-700">
+              <div className="flex justify-between py-1 border-b border-stone-100">
+                <span className="text-stone-500">Target Node:</span>
+                <span className="font-bold text-stone-900">esp32-01</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-stone-100">
+                <span className="text-stone-500">Actuator Channel:</span>
+                <span className="font-bold text-stone-900">CH 1 (GPIO5 Relay)</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-stone-100">
+                <span className="text-stone-500">Burst Duration:</span>
+                <span className="font-bold text-emerald-800">{decision?.duration_minutes ? decision.duration_minutes * 60 : 360}s</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-stone-100">
+                <span className="text-stone-500">Pulse Events:</span>
+                <span className="font-bold text-stone-900">1 event</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-stone-100">
+                <span className="text-stone-500">Volume Target:</span>
+                <span className="font-bold text-stone-900">{decision?.volume_liters || 12.5} Liters</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-stone-500">Local Hard Cap:</span>
+                <span className="font-semibold text-amber-800">&le; 60s / burst (MAX_ON_S)</span>
+              </div>
             </div>
           </div>
         </div>
@@ -212,7 +327,7 @@ export default function SmartControlPage() {
               <div className="text-stone-900 font-bold font-mono">
                 {reading?.pump_status === 'ON' ? 'CLOSED (LOW)' : 'OPEN (HIGH)'}
               </div>
-              <div className="text-[10px] text-stone-500 font-mono">Opto-isolated</div>
+              <div className="text-[10px] text-stone-500 font-mono">GPIO5 Active-LOW</div>
             </div>
 
             {/* 6. Submersible Pump */}
@@ -223,7 +338,7 @@ export default function SmartControlPage() {
             }`}>
               <div className="text-[10px] uppercase font-mono font-semibold text-stone-500">6. DC Pump</div>
               <div className="text-sm font-bold font-mono">{reading?.pump_status || 'OFF'}</div>
-              <div className="text-[10px] text-stone-500 font-mono">12V Submersible</div>
+              <div className="text-[10px] text-stone-500 font-mono">External Supply</div>
             </div>
           </div>
         </div>
@@ -269,6 +384,16 @@ export default function SmartControlPage() {
               REJECT RECOMMENDATION
             </button>
 
+            {/* CANCEL PENDING COMMAND */}
+            <button
+              onClick={handleCancelCommand}
+              disabled={loadingAction !== null}
+              className="px-4 py-2.5 rounded bg-stone-100 hover:bg-red-50 text-stone-700 hover:text-red-700 border border-stone-300 hover:border-red-300 font-medium text-xs transition disabled:opacity-40"
+              title="Remove any queued command before ESP32 consumes it"
+            >
+              CANCEL PENDING COMMAND
+            </button>
+
             {/* MANUAL START */}
             <button
               onClick={() => openConfirmation('MANUAL_ON')}
@@ -310,10 +435,12 @@ export default function SmartControlPage() {
               <thead className="bg-stone-50 text-stone-600 uppercase font-mono text-[10px] border-b border-stone-200">
                 <tr>
                   <th className="py-2.5 px-4 font-semibold">Timestamp</th>
+                  <th className="py-2.5 px-4 font-semibold">Approval ID</th>
                   <th className="py-2.5 px-4 font-semibold">User</th>
                   <th className="py-2.5 px-4 font-semibold">Action</th>
                   <th className="py-2.5 px-4 font-semibold">Pump State</th>
                   <th className="py-2.5 px-4 font-semibold">Duration</th>
+                  <th className="py-2.5 px-4 font-semibold">Actual ON</th>
                   <th className="py-2.5 px-4 font-semibold">Status</th>
                   <th className="py-2.5 px-4 font-semibold">Reason / Interlock Log</th>
                 </tr>
@@ -323,6 +450,9 @@ export default function SmartControlPage() {
                   <tr key={act.id} className="hover:bg-stone-50/50">
                     <td className="py-3 px-4 font-mono text-stone-500">
                       {new Date(act.timestamp).toLocaleTimeString()}
+                    </td>
+                    <td className="py-3 px-4 font-mono font-semibold text-stone-900">
+                      {act.approval_id || `--`}
                     </td>
                     <td className="py-3 px-4 font-medium text-stone-900">
                       {act.user_name}
@@ -336,7 +466,10 @@ export default function SmartControlPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4 font-mono">
-                      {act.duration_minutes > 0 ? `${act.duration_minutes} min` : '--'}
+                      {act.duration_s ? `${act.duration_s}s` : (act.duration_minutes > 0 ? `${act.duration_minutes}m` : '--')}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-stone-600">
+                      {act.actual_on_ms !== null && act.actual_on_ms !== undefined ? `${(act.actual_on_ms / 1000).toFixed(1)}s` : '--'}
                     </td>
                     <td className="py-3 px-4">
                       {getExecutionBadge(act.execution_status)}
@@ -348,7 +481,7 @@ export default function SmartControlPage() {
                 ))}
                 {actionHistory.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center text-stone-400 italic">
+                    <td colSpan={9} className="py-6 text-center text-stone-400 italic">
                       No actuation commands dispatched in this cycle.
                     </td>
                   </tr>

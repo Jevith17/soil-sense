@@ -32,6 +32,7 @@ import { Reading } from '@/types';
 export default function LiveFarmPage() {
   const [history, setHistory] = useState<Reading[]>([]);
   const [latest, setLatest] = useState<Reading | null>(null);
+  const [deviceStatus, setDeviceStatus] = useState<any>(null);
 
   const fetchData = async () => {
     try {
@@ -40,6 +41,8 @@ export default function LiveFarmPage() {
       if (data.length > 0) {
         setLatest(data[data.length - 1]);
       }
+      const dev = await api.getDeviceStatus();
+      setDeviceStatus(dev);
     } catch (e) {
       console.warn('Live farm history fetch error:', e);
     }
@@ -65,7 +68,7 @@ export default function LiveFarmPage() {
     co2: r.co2,
   }));
 
-  const mVal = latest ? latest.moisture : 27.0;
+  const mVal = latest ? (latest.moisture ?? 27.0) : 27.0;
 
   return (
     <DashboardLayout title="SoilSense — Live Instrumentation">
@@ -74,9 +77,16 @@ export default function LiveFarmPage() {
         <SectionHeader
           title="Live Farm Instrumentation"
           moduleIndex={2}
-          subtitle="Continuous multichannel telemetry stream: Soil matric potential, boundary microclimate, and greenhouse atmospheric flux."
+          subtitle="Continuous multichannel telemetry stream: Physical sensors, microclimate boundary layer, and soil chemistry."
           actions={
             <div className="flex items-center gap-2">
+              <span className={`font-mono text-xs px-2.5 py-1 rounded border ${
+                deviceStatus?.status === 'CONNECTED'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-stone-100 text-stone-600 border-stone-200'
+              }`}>
+                NODE: <strong>{deviceStatus?.device_id || 'esp32-01'} ({deviceStatus?.status || 'ONLINE'})</strong>
+              </span>
               <span className="font-mono text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded border border-stone-200">
                 PUMP: <strong className={latest?.pump_status === 'ON' ? 'text-emerald-700' : 'text-stone-700'}>{latest?.pump_status || 'OFF'}</strong>
               </span>
@@ -100,46 +110,47 @@ export default function LiveFarmPage() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <MetricCard
               label="Moisture"
-              value={mVal.toFixed(1)}
+              value={latest?.moisture !== null && latest?.moisture !== undefined ? latest.moisture.toFixed(1) : mVal.toFixed(1)}
               unit="%"
               status={mVal < 35 ? 'CHECK' : 'NORMAL'}
               trend={mVal < 35 ? "↓ Operating Deficit" : "Optimal (35-65%)"}
               trendDirection={mVal < 35 ? 'down' : 'neutral'}
+              secondaryInfo="Measured · Physical (GPIO34)"
             />
             <MetricCard
               label="Soil Temp"
-              value={latest ? latest.soil_temp.toFixed(1) : '29.0'}
+              value={latest?.soil_temp !== null && latest?.soil_temp !== undefined ? latest.soil_temp.toFixed(1) : '29.0'}
               unit="°C"
               status="NORMAL"
-              secondaryInfo="Band: 18–30 °C"
+              secondaryInfo="Measured · DS18B20 (GPIO4)"
             />
             <MetricCard
               label="Soil pH"
               value={latest ? latest.ph.toFixed(2) : '6.40'}
               unit="pH"
               status="NORMAL"
-              secondaryInfo="Optimal: 6.0–7.0"
+              secondaryInfo="Literature · SoilGrids"
             />
             <MetricCard
               label="Nitrogen (N)"
               value={latest ? latest.n.toFixed(0) : '64'}
               unit="mg/kg"
               status="NORMAL"
-              secondaryInfo="Threshold: > 50"
+              secondaryInfo="Literature · SoilGrids"
             />
             <MetricCard
               label="Phosphorus (P)"
               value={latest ? latest.p.toFixed(0) : '51'}
               unit="mg/kg"
               status="NORMAL"
-              secondaryInfo="Threshold: > 30"
+              secondaryInfo="Literature · SoilGrids"
             />
             <MetricCard
               label="Potassium (K)"
               value={latest ? latest.k.toFixed(0) : '73'}
               unit="mg/kg"
               status="NORMAL"
-              secondaryInfo="Threshold: > 40"
+              secondaryInfo="Literature · SoilGrids"
             />
           </div>
         </div>
@@ -160,26 +171,26 @@ export default function LiveFarmPage() {
               value={latest ? latest.air_temp.toFixed(1) : '33.0'}
               unit="°C"
               status={latest && latest.air_temp > 32 ? 'CHECK' : 'NORMAL'}
-              secondaryInfo="VPD Driver: Elevated"
+              secondaryInfo="Measured · DHT22 (GPIO15)"
             />
             <MetricCard
               label="Relative Humidity"
               value={latest ? latest.humidity.toFixed(0) : '65'}
               unit="%"
               status="NORMAL"
-              secondaryInfo="RH Nominal (50–75%)"
+              secondaryInfo="Measured · DHT22 (GPIO15)"
             />
             <MetricCard
               label="Solar Radiation"
               value={latest ? latest.solar.toFixed(0) : '910'}
               unit="W/m²"
               status="NORMAL"
-              secondaryInfo="Photosynthetic Irradiance"
+              secondaryInfo="Boundary · Insolation Model"
             />
           </div>
         </div>
 
-        {/* 3. Grouped Section: EMISSIONS */}
+        {/* 3. Grouped Section: EMISSIONS & BOUNDARY FLUX */}
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-stone-200 pb-1.5">
             <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-stone-800 flex items-center gap-1.5">
@@ -195,15 +206,81 @@ export default function LiveFarmPage() {
               value={latest ? latest.ch4.toFixed(1) : '18.0'}
               unit="ppm"
               status="NORMAL"
-              secondaryInfo="Aerobic threshold < 25 ppm"
+              secondaryInfo="Boundary · Respiration Baseline"
             />
             <MetricCard
               label="Carbon Dioxide (CO₂)"
               value={latest ? latest.co2.toFixed(0) : '620'}
               unit="ppm"
               status="NORMAL"
-              secondaryInfo="Canopy threshold < 800 ppm"
+              secondaryInfo="Boundary · Respiration Baseline"
             />
+          </div>
+        </div>
+
+        {/* 4. Hardware Tier 3 Instrumentation & Peripheral Inventory */}
+        <div className="bg-white border border-stone-200 rounded-lg p-5 shadow-xs space-y-3">
+          <div className="border-b border-stone-100 pb-2 flex items-center justify-between">
+            <div>
+              <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-stone-900 flex items-center gap-1.5">
+                <Cpu className="h-4 w-4 text-forest-700" />
+                Physical Hardware Peripheral Inventory (Framework v3 Scope)
+              </h3>
+              <p className="text-[11px] text-stone-500">
+                Authoritative breakdown of installed physical instrumentation vs uninstalled laboratory expansion channels.
+              </p>
+            </div>
+            <span className="text-[11px] font-mono text-stone-500">Node: {deviceStatus?.device_id || 'esp32-01'}</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+            <div className="p-2.5 rounded bg-stone-50 border border-stone-200">
+              <div className="text-[10px] text-stone-500 uppercase">Soil Moisture Sensor</div>
+              <div className="font-bold text-forest-800 mt-0.5">Fitted (GPIO 34)</div>
+              <div className="text-[10px] text-stone-500">Capacitive Analog 12-bit</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50 border border-stone-200">
+              <div className="text-[10px] text-stone-500 uppercase">Soil Temperature Probe</div>
+              <div className="font-bold text-forest-800 mt-0.5">Fitted (GPIO 4)</div>
+              <div className="text-[10px] text-stone-500">DS18B20 1-Wire Digital</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50 border border-stone-200">
+              <div className="text-[10px] text-stone-500 uppercase">Ambient Temp / Humidity</div>
+              <div className="font-bold text-forest-800 mt-0.5">Fitted (GPIO 15)</div>
+              <div className="text-[10px] text-stone-500">DHT22 Digital Bus</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50 border border-stone-200">
+              <div className="text-[10px] text-stone-500 uppercase">Pump Actuation Relay</div>
+              <div className="font-bold text-forest-800 mt-0.5">Fitted (GPIO 5)</div>
+              <div className="text-[10px] text-stone-500">1-Ch Active-LOW Opto</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50/60 border border-dashed border-stone-300">
+              <div className="text-[10px] text-stone-400 uppercase">Electrical Conductivity</div>
+              <div className="font-semibold text-stone-400 mt-0.5">Not fitted</div>
+              <div className="text-[10px] text-stone-400">EC Probe Port Empty</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50/60 border border-dashed border-stone-300">
+              <div className="text-[10px] text-stone-400 uppercase">Total Dissolved Solids</div>
+              <div className="font-semibold text-stone-400 mt-0.5">Not fitted</div>
+              <div className="text-[10px] text-stone-400">TDS Analog Port Empty</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50/60 border border-dashed border-stone-300">
+              <div className="text-[10px] text-stone-400 uppercase">Solution pH Sensor</div>
+              <div className="font-semibold text-stone-400 mt-0.5">Not fitted</div>
+              <div className="text-[10px] text-stone-400">Glass Electrode Empty</div>
+            </div>
+
+            <div className="p-2.5 rounded bg-stone-50/60 border border-dashed border-stone-300">
+              <div className="text-[10px] text-stone-400 uppercase">Tank Level Float Switch</div>
+              <div className="font-semibold text-stone-400 mt-0.5">Not fitted</div>
+              <div className="text-[10px] text-stone-400">Ultrasonic/Float Empty</div>
+            </div>
           </div>
         </div>
 

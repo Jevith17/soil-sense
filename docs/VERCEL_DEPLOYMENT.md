@@ -30,7 +30,9 @@ This guide covers deploying the **SoilSense** platform to **Vercel**, including 
 ## Method 1: Deploy via Vercel Dashboard (Recommended)
 
 ### Step 1: Push Code to GitHub / GitLab / Bitbucket
+
 Ensure your repository is pushed to your Git provider:
+
 ```bash
 git add .
 git commit -m "Configure Vercel deployment for SoilSense"
@@ -38,6 +40,7 @@ git push origin main
 ```
 
 ### Step 2: Import into Vercel
+
 1. Log in to [vercel.com](https://vercel.com) and click **"Add New Project"**.
 2. Select your repository.
 3. Configure the **Project Settings**:
@@ -47,17 +50,19 @@ git push origin main
    - **Output Directory**: `.next`
 
 ### Step 3: Configure Environment Variables
+
 In Vercel **Project Settings > Environment Variables**, add:
 
-| Variable | Recommended Value | Purpose |
-| :--- | :--- | :--- |
-| `BACKEND_URL` | `https://your-backend.onrender.com` | Next.js server-side proxy target (prevents CORS) |
-| `NEXT_PUBLIC_API_URL` | *(Optional)* `https://your-backend.onrender.com/api` | Direct client-side API target |
+| Variable              | Recommended Value                                    | Purpose                                          |
+| :-------------------- | :--------------------------------------------------- | :----------------------------------------------- |
+| `BACKEND_URL`         | `https://your-backend.onrender.com`                  | Next.js server-side proxy target (prevents CORS) |
+| `NEXT_PUBLIC_API_URL` | _(Optional)_ `https://your-backend.onrender.com/api` | Direct client-side API target                    |
 
 > [!TIP]
 > If you don't have a backend deployed yet, you can leave `BACKEND_URL` empty. The landing page, public documentation, and interactive UI components will still run standalone on Vercel!
 
 ### Step 4: Click "Deploy"
+
 Vercel will build and deploy the application in under 60 seconds.
 
 ---
@@ -91,6 +96,7 @@ npx vercel --prod
 Because SoilSense uses a persistent SQLite database (`agrichem.db`), Scikit-Learn models, and continuous telemetry event loops, the Python backend needs a persistent container.
 
 ### Deploying Backend to Render (Free / Low Cost)
+
 1. Go to [render.com](https://render.com) and create a **New Web Service**.
 2. Connect your Git repository.
 3. Set the following parameters:
@@ -107,7 +113,9 @@ Because SoilSense uses a persistent SQLite database (`agrichem.db`), Scikit-Lear
 6. Paste it into your Vercel project's `BACKEND_URL` environment variable.
 
 ### Deploying Backend with Docker
+
 You can also use the included `docker-compose.yml` to deploy both frontend and backend to any cloud VPS (DigitalOcean, AWS EC2, Hetzner):
+
 ```bash
 docker compose up -d --build
 ```
@@ -117,6 +125,7 @@ docker compose up -d --build
 ## Verifying the Deployment
 
 Once deployed on Vercel:
+
 1. Visit your Vercel URL (e.g. `https://soilsense.vercel.app`).
 2. Verify the **Landing Page** loads.
 3. Click **"Documentation"** to verify that all documentation pages, math formulas, and code snippets render.

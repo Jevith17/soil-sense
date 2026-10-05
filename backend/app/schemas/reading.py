@@ -3,22 +3,30 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 class ReadingBase(BaseModel):
-    moisture: float = Field(..., description="Soil moisture percentage (0-100)")
-    soil_temp: float = Field(..., description="Soil temperature in °C")
-    ph: float = Field(..., description="Soil pH level (0-14)")
-    n: float = Field(..., description="Nitrogen mg/kg")
-    p: float = Field(..., description="Phosphorus mg/kg")
-    k: float = Field(..., description="Potassium mg/kg")
-    air_temp: float = Field(..., description="Air temperature in °C")
-    humidity: float = Field(..., description="Relative humidity %")
-    solar: float = Field(..., description="Solar irradiance W/m²")
-    ch4: float = Field(..., description="Methane in ppm")
-    co2: float = Field(..., description="Carbon dioxide in ppm")
-    pump_status: Optional[str] = "OFF"
-    data_source: Optional[str] = "SIMULATED" # "REAL" or "SIMULATED"
-    device_id: Optional[str] = "ESP32-AGRI-01"
+    moisture: Optional[float] = Field(None, description="Soil moisture percentage (0-100), null on sensor fault")
+    soil_temp: Optional[float] = Field(None, description="Soil temperature in °C, null on sensor fault")
+    air_temp: Optional[float] = Field(None, description="Air temperature in °C, null on sensor fault")
+    humidity: Optional[float] = Field(None, description="Relative humidity %, null on sensor fault")
+    
+    # Tier 1/2 soil baseline & boundary conditions (can be omitted by physical ESP32)
+    ph: Optional[float] = Field(6.4, description="Soil pH level (0-14)")
+    n: Optional[float] = Field(64.0, description="Nitrogen mg/kg")
+    p: Optional[float] = Field(51.0, description="Phosphorus mg/kg")
+    k: Optional[float] = Field(73.0, description="Potassium mg/kg")
+    solar: Optional[float] = Field(850.0, description="Solar irradiance W/m²")
+    ch4: Optional[float] = Field(18.0, description="Methane in ppm")
+    co2: Optional[float] = Field(600.0, description="Carbon dioxide in ppm")
+    
+    pump_status: Optional[Any] = "OFF" # bool or str ("OFF", "ON", False, True)
+    data_source: Optional[str] = "SIMULATED" # "REAL" or "SIMULATED" or "Measured"
+    device_id: Optional[str] = "esp32-01"
+    uptime_s: Optional[int] = None
     analog_moisture_raw: Optional[int] = None
+    moisture_raw: Optional[int] = None # Alias for analog_moisture_raw per Framework v3
     digital_moisture_raw: Optional[int] = None
+    sensor_health: Optional[Dict[str, str]] = None
+    overall_health: Optional[str] = "NORMAL"
+    firmware_version: Optional[str] = "1.0.0"
 
 class ReadingCreate(ReadingBase):
     timestamp: Optional[datetime] = None

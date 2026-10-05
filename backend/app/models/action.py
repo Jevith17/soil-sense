@@ -18,8 +18,20 @@ class Action(Base):
     volume_liters = Column(Float, default=0.0)
     reason = Column(String(255), nullable=True)
     
-    # Execution status: PENDING, DISPATCHED, EXECUTED, REJECTED, SAFETY_BLOCKED
+    # Execution status: PENDING, DISPATCHED, EXECUTED, REJECTED, SAFETY_BLOCKED, EVENT_DONE, COMPLETED, ABORTED_FAULT
     execution_status = Column(String(50), default="PENDING")
     is_hardware_dispatched = Column(Boolean, default=False)
     executed_at = Column(DateTime, nullable=True)
+
+    # Hardware execution and acknowledgement tracking (Framework v3)
+    approval_id = Column(String(50), nullable=True, index=True)
+    channel = Column(Integer, default=1)
+    duration_s = Column(Float, default=0.0)
+    events = Column(Integer, default=1)
+    interval_s = Column(Float, default=0.0)
+    actual_on_ms = Column(Integer, nullable=True)
+    event_no = Column(Integer, default=1)
+    ack_status = Column(String(50), nullable=True)
+    ack_reason = Column(String(255), nullable=True)
+    device_id = Column(String(50), default="esp32-01")
 

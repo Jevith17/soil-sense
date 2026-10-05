@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # ESP32 Auth & Hardware
     ESP32_DEVICE_ID: str = "ESP32-AGRI-01"
     ESP32_API_KEY: str = "esp32-secure-token-agrichem-2026"
-    PUMP_HARDWARE_ENABLED: bool = False
+    PUMP_HARDWARE_ENABLED: bool = True
     
     # Process limits & safety
     MAX_PUMP_RUNTIME_MINUTES: int = 15
