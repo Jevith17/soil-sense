@@ -1,6 +1,6 @@
-# AgriChem AI - Autonomous Process Intelligence & Decision Platform
+# SOilSense - Autonomous Process Intelligence & Decision Platform
 
-AgriChem AI is an end-to-end, full-stack, machine learning, and IoT platform that applies chemical engineering transport principles and machine learning to precision agriculture.
+SoilSense is an end-to-end, full-stack, machine learning, and IoT platform that applies chemical engineering transport principles and machine learning to precision agriculture.
 
 It reads real-time telemetry from an ESP32 or simulated sensor array, executes deterministic pre-inference sensor health checks, computes chemical engineering mass balances (water and nitrogen conservation), runs a Random Forest decision classifier, formulates transparent attributions ("WHY"), enforces non-negotiable hardware safety interlocks, mandates human-in-the-loop approval, actuates an active-LOW relay pump, and evaluates post-irrigation feedback into an Experiment Lab to retrain the AI model continuously.
 
